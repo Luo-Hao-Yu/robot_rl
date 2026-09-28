@@ -22,6 +22,7 @@ When you clone this repo, please use Git Large File System (lfs).
     ```bash
     # use 'PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
     python -m pip install -e source/robot_rl
+    ```
 
 - Verify that the extension is correctly by attempting to train:
 
@@ -31,6 +32,19 @@ When you clone this repo, please use Git Large File System (lfs).
         # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
         python scripts/<RL_LIBRARY>/train.py --task=<TASK_NAME>
         ```
+
+### Local Docker setup (Isaac Lab 2.3 / Isaac Sim 5.1)
+
+If `isaac-lab-template:latest` is already available locally, the project can use its Python 3.11 environment without installing Isaac Sim on the host. The image must contain Isaac Lab 2.3 and Isaac Sim 5.1, and Docker must have the NVIDIA runtime configured.
+
+```bash
+docker build -f Dockerfile -t robot-rl:local .
+bash scripts/run_docker.sh scripts/rsl_rl/train.py --task=G1-flat-vel --headless --num_envs=1 --max_iterations=1
+```
+
+The build installs `source/robot_rl` in editable mode. `scripts/run_docker.sh` mounts this repository at the same path inside the container, so code edits are picked up without rebuilding the image. Training logs and checkpoints are written to `logs/rsl_rl/` and owned by the invoking user. Rebuild the image only when changing the package's installation metadata or Dockerfile. This host requires `--runtime=nvidia` in addition to `--gpus all`; the runner sets both.
+
+The one-iteration command is a smoke test, not a trained policy. For a real run, remove `--max_iterations=1` and choose an appropriate `--num_envs`. The repository-specific `train_policy.py --env_type=vanilla` entry point enables Weights & Biases logging, which needs separate account setup.
 
 ### Set up IDE (Optional)
 
@@ -152,7 +166,10 @@ Obelisk folder for further instructions.
 To run the sim2sim transfer, you will to install these dependencies in your conda environment:
 - `pygame`
 - `mujoco`
+- `mediapy` (used by `transfer/sim/g1_runner.py` for video recording)
 - `huggingface_hub`
+
+The Docker image described above includes these Python packages. Running sim2sim still requires a valid config file and an exported policy checkpoint.
 
 ## Updating IsaacLab
 Sometimes you will want to updated the version of IsaacLab you are using. To do this, go to the IsaacLab directory

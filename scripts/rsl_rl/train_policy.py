@@ -1,7 +1,7 @@
 import argparse
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import cli_args
 from isaaclab.app import AppLauncher
@@ -149,8 +149,7 @@ def main():
 
     # Set the task based on environment type
     args_cli.task = ENVIRONMENTS[args_cli.env_type]
-    args_cli.logger = "wandb"
-    args_cli.log_project_name = "g1_rl"
+    args_cli.logger = "tensorboard"
 
     # always enable cameras to record video
     if args_cli.video:
@@ -173,7 +172,7 @@ def main():
         multi_agent_to_single_agent,
     )
     from isaaclab.utils.dict import print_dict
-    from isaaclab.utils.io import dump_pickle, dump_yaml
+    from isaaclab.utils.io import dump_yaml
     import omni
     from isaaclab_rl.rsl_rl import RslRlBaseRunnerCfg, RslRlVecEnvWrapper
     from isaaclab_tasks.utils.hydra import hydra_task_config
@@ -218,7 +217,7 @@ def main():
         print(f"[INFO] Logging experiment in directory: {log_root_path}")
 
         # Create timestamp-based run directory
-        log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        log_dir = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d_%H-%M-%S")
         if agent_cfg.run_name:
             log_dir += f"_{agent_cfg.run_name}"
         log_dir = os.path.join(log_root_path, log_dir)
@@ -274,8 +273,6 @@ def main():
         # Save configurations
         dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
         dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
-        dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
-        dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
         # Run training
         runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=False)
