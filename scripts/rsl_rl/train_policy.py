@@ -64,6 +64,12 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
     parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
     parser.add_argument(
+        "--init_student_checkpoint",
+        type=str,
+        default=None,
+        help="Initialize a PPO actor from the student network in a distillation checkpoint.",
+    )
+    parser.add_argument(
         "--distributed", action="store_true", default=False, help="Run training with multiple GPUs or nodes."
     )
     parser.add_argument(
@@ -76,7 +82,10 @@ def parse_args():
     cli_args.add_rsl_rl_args(parser)
     # append AppLauncher cli args
     AppLauncher.add_app_launcher_args(parser)
-    return parser.parse_known_args()
+    args_cli, hydra_args = parser.parse_known_args()
+    if args_cli.init_student_checkpoint and args_cli.resume:
+        parser.error("--init_student_checkpoint cannot be combined with --resume")
+    return args_cli, hydra_args
 import re
 def get_checkpoint_path(
     log_path: str, run_dir: str = ".*", checkpoint: str = ".*", other_dirs: list[str] = None, sort_alpha: bool = True
@@ -180,6 +189,7 @@ def main():
     import robot_rl.tasks
 
     from rsl_rl.runners import OnPolicyRunner, DistillationRunner
+    from student_checkpoint import initialize_student_actor
 
     # Configure PyTorch
     torch.backends.cuda.matmul.allow_tf32 = True
@@ -263,6 +273,14 @@ def main():
             raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
         # write git state to logs
         runner.add_git_repo_to_log(__file__)
+
+        if args_cli.init_student_checkpoint:
+            if agent_cfg.class_name != "OnPolicyRunner":
+                raise ValueError("--init_student_checkpoint requires a PPO OnPolicyRunner task")
+            checkpoint_path = os.path.abspath(os.path.expanduser(args_cli.init_student_checkpoint))
+            iteration = initialize_student_actor(runner, checkpoint_path)
+            print(f"[INFO]: Initialized PPO actor from distilled student: {checkpoint_path} (iteration {iteration})")
+            print("[INFO]: PPO critic, optimizer, action noise, and iteration counter start fresh.")
 
         # Load checkpoint if resuming
         if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
